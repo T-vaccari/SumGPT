@@ -1,0 +1,6 @@
+test/
+dataset/
+checkpoints/
+__pycache__/
+train.bin
+val.bin
