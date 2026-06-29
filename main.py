@@ -1,5 +1,6 @@
 import torch
 from model import SumGPT
+import random
 
 # ---------------------------------------------------------------------------
 # Config
@@ -70,6 +71,18 @@ tests = [
 print("--- spot checks ---")
 for a, b in tests:
     print(predict(a, b))
+
+
+correct = 0
+total   = 1000
+
+for _ in range(total):
+    a = random.randint(0, 999)
+    b = random.randint(0, 999)
+    result = predict(a, b)
+    correct += 1 if '✓' in result else 0
+
+print(f"Accuracy: {correct}/{total} = {correct/total*100:.1f}%")
 
 print("--- interactive (q to quit) ---")
 while True:
