@@ -38,6 +38,7 @@ stoi       = {ch: i for i, ch in enumerate(chars)}
 itos       = {i: ch for i, ch in enumerate(chars)}
 encode     = lambda s: [stoi[c] for c in s]
 decode     = lambda l: ''.join([itos[i] for i in l])
+eq_id      = stoi['=']   
 
 
 def get_batch(split):
@@ -46,6 +47,14 @@ def get_batch(split):
     ix         = torch.randint(n_examples, (batch_size,)) * example_len
     x = torch.stack([torch.from_numpy(data[i:i + block_size].astype(np.int64))         for i in ix])
     y = torch.stack([torch.from_numpy(data[i + 1:i + block_size + 1].astype(np.int64)) for i in ix])
+
+    # ignora nella loss tutto ciò che precede '=': operandi casuali e '+'
+    # non sono apprendibili — solo le cifre della somma (e il \n finale) contano
+    eq_pos  = (x == eq_id).float().argmax(dim=1)
+    col_idx = torch.arange(block_size).unsqueeze(0)
+    mask    = col_idx < eq_pos.unsqueeze(1)
+    y[mask] = -100
+
     return x.to(device), y.to(device)
 
 
