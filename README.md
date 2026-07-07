@@ -3,4 +3,5 @@ The architecture is pretty straightforward, just adapted to work with that task,
 Took something like 3 min to train on my GPU, maybe a bit longer on CPU.
 
 In the repo is also present the trained checkpoint so you can use that to train with inference.py, give it a spin!
+I also indexe it using deep-wiki: https://deepwiki.com/T-vaccari/SumGPT/1-sumgpt-overview
 ![SumGPT](assets/image.png)
