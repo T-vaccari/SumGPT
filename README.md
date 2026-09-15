@@ -17,3 +17,5 @@ python main.py
 New data and checkpoints are written to `data/` and `checkpoints/llm-library/`; historical checkpoint files are left untouched.
 
 The initial GPU run reached 100.00% on 1,000 sampled held-out records after 1,000 training steps.
+
+Also indexed with DeepWiki: https://deepwiki.com/T-vaccari/SumGPT/1-sumgpt-overview
