@@ -1,5 +1,9 @@
 test/
 dataset/
+data/
+checkpoints/llm-library/
 __pycache__/
 train.bin
 val.bin
+
+.venv/

@@ -1,0 +1,9 @@
+[project]
+name = "sumgpt"
+version = "0.1.0"
+description = "SumGPT: summarization language model, consumer of llm-library"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "llm-library @ git+https://github.com/T-vaccari/llm-library.git@v0.1.0",
+    "numpy",
+]
