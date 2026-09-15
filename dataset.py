@@ -1,49 +1,36 @@
-import random
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-N       = 1000000
-REVERSE = True
-SEED    = 42
-# ---------------------------------------------------------------------------
-
-def generate(n=N, reverse=REVERSE, seed=SEED):
-    random.seed(seed)
-    pairs = set()
-    while len(pairs) < n:
-        a = random.randint(0, 999)
-        b = random.randint(0, 999)
-        pairs.add((a, b))
-
-    lines = []
-    for a, b in pairs:
-        result = str(a + b).zfill(4)
-        if reverse:
-            result = result[::-1]
-        lines.append(f"{str(a).zfill(3)}+{str(b).zfill(3)}={result}")
-
-    return '\n'.join(lines) + '\n'
+from adapter import RECORD_LENGTH, encode, format_record
 
 
-if __name__ == '__main__':
-    text = generate()
+def build_records(seed: int) -> np.ndarray:
+    pairs = np.arange(1_000_000, dtype=np.int32)
+    np.random.default_rng(seed).shuffle(pairs)
+    records = np.empty((len(pairs), RECORD_LENGTH), dtype=np.uint8)
+    for row, pair in enumerate(pairs):
+        records[row] = encode(format_record(int(pair // 1000), int(pair % 1000)))
+    return records
 
-    # vocab
-    chars  = sorted(list(set(text)))
-    stoi   = {ch: i for i, ch in enumerate(chars)}
-    encode = lambda s: [stoi[c] for c in s]
 
-    # encode and split
-    ids = np.array(encode(text), dtype=np.uint16)
-    n   = int(0.9 * len(ids))
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir", type=Path, default=Path("data"))
+    parser.add_argument("--seed", type=int, default=1337)
+    parser.add_argument("--validation-fraction", type=float, default=0.1)
+    args = parser.parse_args()
 
-    np.array(ids[:n]).tofile('train.bin')
-    np.array(ids[n:]).tofile('val.bin')
+    records = build_records(args.seed)
+    split = int(len(records) * (1 - args.validation_fraction))
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    np.save(args.output_dir / "train.npy", records[:split])
+    np.save(args.output_dir / "val.npy", records[split:])
+    print(f"wrote {split} training and {len(records) - split} validation records to {args.output_dir}")
 
-    print(f"Total tokens : {len(ids):,}")
-    print(f"Train tokens : {n:,}")
-    print(f"Val tokens   : {len(ids) - n:,}")
-    print(f"Vocab        : {chars}")
-    print(f"Example      : {text.splitlines()[0]}")
+
+if __name__ == "__main__":
+    main()

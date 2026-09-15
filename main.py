@@ -1,99 +1,39 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import numpy as np
 import torch
-from model import SumGPT
-import random
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-device   = 'cuda'
-ckpt     = 'checkpoints/ckpt_best.pt'
-reverse  = True    # must match how data.py was run
-# ---------------------------------------------------------------------------
-
-# vocab — hardcoded, same as training
-chars  = sorted(list("\n0123456789+="))
-stoi   = {ch: i for i, ch in enumerate(chars)}
-itos   = {i: ch for i, ch in enumerate(chars)}
-encode = lambda s: [stoi[c] for c in s]
-decode = lambda l: ''.join([itos[i] for i in l])
-
-# ---------------------------------------------------------------------------
-# Load model from checkpoint
-# ---------------------------------------------------------------------------
-state    = torch.load(ckpt, map_location=device, weights_only=True)
-config   = state['config']
-
-model = SumGPT(
-    vocab_size = config['vocab_size'],
-    n_embd     = config['n_embd'],
-    n_head     = config['n_head'],
-    block_size = config['block_size'],
-    n_blocks   = config['n_blocks'],
-    dropout    = config['dropout'],
-).to(device)
-
-model.load_state_dict(state['model'])
-model.eval()
-print(f"Loaded checkpoint from step {state['step']} | val loss {state['best_val_loss']:.4f}\n")
+from adapter import complete, decode
+from model import build_model
 
 
-# ---------------------------------------------------------------------------
-# Inference
-# ---------------------------------------------------------------------------
-@torch.no_grad()
-def predict(a: int, b: int) -> str:
-    prompt  = f"{str(a).zfill(3)}+{str(b).zfill(3)}="
-    idx     = torch.tensor([encode(prompt)], dtype=torch.long, device=device)  # (1, T)
-    output  = model.generate(idx, max_new_tokens=5, decode=decode)
-    # extract only the generated part after '='
-    generated = decode(output[0].tolist())[len(prompt):]
-    generated = generated.split('\n')[0]   # stop at newline
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--checkpoint", type=Path, default=Path("checkpoints/llm-library/best.pt"))
+    parser.add_argument("--data", type=Path, default=Path("data/val.npy"))
+    parser.add_argument("--cases", type=int, default=1000)
+    parser.add_argument("--seed", type=int, default=1337)
+    parser.add_argument("--device", default="cuda")
+    args = parser.parse_args()
 
-    result_digits = generated[::-1] if reverse else generated
-    predicted = int(result_digits) if result_digits.isdigit() else None
-    correct   = a + b
-
-    status = '✓' if predicted == correct else '✗'
-    return f"{prompt}{generated}  →  {status}  (expected {correct})"
-
-
-# ---------------------------------------------------------------------------
-# Run some tests
-# ---------------------------------------------------------------------------
-tests = [
-    (1,   2),
-    (123, 456),
-    (999, 999),
-    (0,   0),
-    (100, 900),
-]
-
-print("--- spot checks ---")
-for a, b in tests:
-    print(predict(a, b))
+    device = torch.device(args.device)
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=True)
+    model = build_model(checkpoint["config"], device)
+    model.load_state_dict(checkpoint["model"])
+    model.eval()
+    generator = torch.Generator().manual_seed(args.seed)
+    records = np.load(args.data)
+    correct = 0
+    for _ in range(args.cases):
+        row = torch.randint(0, len(records), (1,), generator=generator).item()
+        expected = decode(records[row].tolist())
+        prediction = complete(model, expected[:8], device)
+        correct += prediction == expected[:12]
+    print(f"validation_accuracy={correct / args.cases:.2%} ({correct}/{args.cases})")
 
 
-correct = 0
-total   = 1000
-
-for _ in range(total):
-    a = random.randint(0, 999)
-    b = random.randint(0, 999)
-    result = predict(a, b)
-    correct += 1 if '✓' in result else 0
-
-print(f"Accuracy: {correct}/{total} = {correct/total*100:.1f}%")
-
-print("--- interactive (q to quit) ---")
-while True:
-    try:
-        raw = input("\na b: ").strip()
-        if raw == 'q':
-            break
-        a, b = map(int, raw.split())
-        if not (0 <= a <= 999 and 0 <= b <= 999):
-            print("numbers must be in range 0-999")
-            continue
-        print(predict(a, b))
-    except ValueError:
-        print("enter two integers separated by space, e.g. 123 456")
+if __name__ == "__main__":
+    main()
